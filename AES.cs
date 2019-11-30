@@ -3,30 +3,60 @@ using System;
 using Program;
 namespace AES{
     class AES{
-        const string plaintext = "helloworldhellow";
-        const string key = "p3s6v9y$B&E)H+Mb";
-        static int[] rcon = new int[10]{2,4,8,16,32,64,128,27,54,108};
+        const string plaintext = "Two One Nine Two";
+        const string key = "Thats my Kung Fu";
+        static int[,] rcon = new int[11,4]{
+            {1,0,0,0},  {2,0,0,0},  {4,0,0,0},  {8,0,0,0},
+            {16,0,0,0}, {32,0,0,0}, {64,0,0,0}, {128,0,0,0},
+            {27,0,0,0}, {54,0,0,0}, {108,0,0,0}
+        };
         //recursivley encrypt each round and generate round key at end of iteration
         public static void Main(string[] args){
-            //Console.WriteLine('a'^'b');
+
             //create 2d arrays
-            byte[,] text = Make2DArray(plaintext.ToCharArray(),4,4);
-            byte[,] key_array = Make2DArray(key.ToCharArray(),4,4);
+            Console.WriteLine(65^66);
+            byte[,] state = Make2DArray(plaintext.ToCharArray(),4,4);
+            byte[,] key_arr = Make2DArray(key.ToCharArray(),4,4);
+            string output = encrypt(state,key_arr);
+            Console.WriteLine(output);
+
+            //decryption x.x
+            //state = Make2DArray(output.ToCharArray(),4,4);
+            //output = encrypt(state,key_arr);
             
-            Console.WriteLine(encrypt_round(text,key_array,0));
         }
-        //might be easier to pass char arrays than to convert them inside the method
-        public static string encrypt_round(byte[,] state, byte[,] round_key, int n){
+        public static string encrypt(byte[,] state, byte[,] key_array){
+            //round 0
+            state = XOrRoundKey(key_array,state);
+
+            //rounds 1-10
+            state = encrypt_round(state,key_array,0);
+
+            string cyphertext = "";
+            //maybe use a range for your indices throughout the project
+            //so that you can iterate with a foreach
+            //or create a key obj
+            for(int col=0;col<4;col++){
+                for(int row=0;row<4;row++){
+                    cyphertext+=state[row,col]+" ";
+                }
+            }
+            return cyphertext;
+        }
+        public static byte[,] encrypt_round(byte[,] state, byte[,] round_key, int n){
             n++;
-            Console.WriteLine("ROUND: "+n+"\nPLAINTEXT: "+Print2DArray(state,4,4)+"\nKEY: "+Print2DArray(round_key,4,4)+"\n");
-            state = SubBytes(state);
+            state = SubBytes(state, "s-box.txt");
             state = ShiftRows(state);
-            state = MixColumns(state);
+            if(n!=10){
+                state = MixColumns(state);
+            }
+
+            round_key = key_expansion(round_key,n-1);
             state = XOrRoundKey(state,round_key);
             
-            
-            string s  = n==10 ? plaintext: encrypt_round(state,key_expansion(round_key,rcon[n]),n);
-            return s;
+            //end case
+            state  = n==10 ? state: encrypt_round(state,round_key,n);
+            return state;
         }
 
         static byte[,] ShiftRows(byte[,] state){
@@ -38,22 +68,34 @@ namespace AES{
             }
             return output;
         }
-        static byte[,] SubBytes(byte[,] state){
+        static byte[,] SubBytes(byte[,] state, string infile){
             FileHelper f = new FileHelper();
-            string raw_vals = f.FileInput("s-box.txt");
+            string raw_vals = f.FileInput(infile);
             string[] sbox = raw_vals.Split(" ");
-
+            
             for(int i=0;i<4;i++){
                 for(int j=0;j<4;j++){
                 byte b = state[i,j];
                 string bits = Convert.ToString(b,2).PadLeft(8,'0');
                 int x = Convert.ToInt16(bits.Substring(0,4),2);
                 int y = Convert.ToInt16(bits.Substring(4,4),2);
-                int index = y*16+x;
+                int index = y+x*16;
                 state[i,j] = (byte)Convert.ToInt16(sbox[index],16);
                 }
             }
             return state;
+        }
+        static string SubByte(byte b, string infile){
+            FileHelper f = new FileHelper();
+            string raw_vals = f.FileInput(infile);
+            string[] sbox = raw_vals.Split(" ");
+
+            string bits = Convert.ToString(b,2).PadLeft(8,'0');
+            int x = Convert.ToInt16(bits.Substring(0,4),2);
+            int y = Convert.ToInt16(bits.Substring(4,4),2);
+            int index = y+x*16;
+            string c = sbox[index];
+            return c;
         }
         static byte[,] MixColumns(byte[,] state){
 
@@ -67,31 +109,17 @@ namespace AES{
             byte[,] output = new byte[4,4];
             byte sum = 0;
             for(int column=0;column<4;column++){
-                for(int b=0;b<4;b++){
-                    for(int i=0;i<4;i++){
-                        sum = (byte)(sum^(state[b,column]*k[column,i]));
+                for(int i=0;i<4;i++){
+                    sum = 0;
+                    for(int b=0;b<4;b++){
+                        sum = (byte)(sum^(gmul(state[b,column],k[i,b])));
                     }
-                    output[b,column] = sum;
+                    output[i,column] = sum;
                 }
             }
             return output;
         }
-        static byte[,] key_expansion(byte[,] key, int n){
-            byte[,] output = new byte[4,4];
-
-            for(int word=0;word<4;word++){
-                for(int b=0;b<4;b++){
-                    if(word==0){
-                        output[b,word] = (byte)(key[b,word]^key[(b+1)%3,word]^n);
-                    }
-                    else{
-                        output[b,word] = (byte)(key[b,word]^output[b,word-1]);
-                    }
-                }
-            }
-            return output;
-        }
-        //this function computes XOR addition and subtraction
+        //this function computes XOR addition between two blocks
         static byte[,] XOrRoundKey(byte[,] a, byte[,] b){
             byte[,] output = new byte[4,4];
             for(int i=0;i<4;i++){
@@ -102,6 +130,26 @@ namespace AES{
             
             return output;
         }
+        static byte[,] key_expansion(byte[,] key, int n){
+            byte[,] output = new byte[4,4];
+
+            for(int word=0;word<4;word++){
+                for(int b=0;b<4;b++){
+                    if(word==0){
+                        byte rot3 = key[(b+5)%4,word+3];
+                        int s_byte = Convert.ToInt16(SubByte(rot3,"s-box.txt"),16);
+                        int xorme = s_byte^rcon[n,b];
+                        output[b,word] = (byte)(xorme^key[b,word]);
+                    }
+                    else{
+                        output[b,word] = (byte)(key[b,word]^output[b,word-1]);
+                    }
+                }
+            }
+            return output;
+        }
+ 
+        //this fx computes bit multiplication
         static int gmul(int a, int b){
             int product = 0;
             int high_bits;
@@ -121,7 +169,6 @@ namespace AES{
                 }
                 b = b >> 1;
             }
-
             return product;
         }
         private static byte[,] Make2DArray(char[] input, int height, int width){
@@ -140,14 +187,10 @@ namespace AES{
                 output+="\n";
                 for (int h = 0; h < height; h++)
                 {
-                    output+=(char)input[w,h]+" ";
+                    output+=Convert.ToString(input[w,h],16)+" ";
                 }
             }
                 return output;
         }
     }
 }
-
-
-/*To create the state array...
-For each row in A, multiply by */
