@@ -3,18 +3,17 @@ using System;
 using Program;
 namespace AES{
     class AES{
-        const string plaintext = "Two One Nine Two";
-        const string key = "Thats my Kung Fu";
-        static int[,] rcon = new int[11,4]{
+        //const string plaintext = "Two One Nine Two";
+        //const string key = "Thats my Kung Fu";
+         int[,] rcon = new int[11,4]{
             {1,0,0,0},  {2,0,0,0},  {4,0,0,0},  {8,0,0,0},
             {16,0,0,0}, {32,0,0,0}, {64,0,0,0}, {128,0,0,0},
             {27,0,0,0}, {54,0,0,0}, {108,0,0,0}
         };
         //recursivley encrypt each round and generate round key at end of iteration
-        public static void Main(string[] args){
+        public void go(string plaintext, string key){
 
             //create 2d arrays
-            Console.WriteLine(65^66);
             byte[,] state = Make2DArray(plaintext.ToCharArray(),4,4);
             byte[,] key_arr = Make2DArray(key.ToCharArray(),4,4);
             string output = encrypt(state,key_arr);
@@ -25,7 +24,7 @@ namespace AES{
             //output = encrypt(state,key_arr);
             
         }
-        public static string encrypt(byte[,] state, byte[,] key_array){
+        private string encrypt(byte[,] state, byte[,] key_array){
             //round 0
             state = XOrRoundKey(key_array,state);
 
@@ -43,7 +42,7 @@ namespace AES{
             }
             return cyphertext;
         }
-        public static byte[,] encrypt_round(byte[,] state, byte[,] round_key, int n){
+        private byte[,] encrypt_round(byte[,] state, byte[,] round_key, int n){
             n++;
             state = SubBytes(state, "s-box.txt");
             state = ShiftRows(state);
@@ -59,7 +58,7 @@ namespace AES{
             return state;
         }
 
-        static byte[,] ShiftRows(byte[,] state){
+        byte[,] ShiftRows(byte[,] state){
             byte[,] output = new byte[4,4];
             for(int row=0;row<4;row++){
                 for(int b=0;b<4;b++){
@@ -68,7 +67,7 @@ namespace AES{
             }
             return output;
         }
-        static byte[,] SubBytes(byte[,] state, string infile){
+        byte[,] SubBytes(byte[,] state, string infile){
             FileHelper f = new FileHelper();
             string raw_vals = f.FileInput(infile);
             string[] sbox = raw_vals.Split(" ");
@@ -85,7 +84,7 @@ namespace AES{
             }
             return state;
         }
-        static string SubByte(byte b, string infile){
+        string SubByte(byte b, string infile){
             FileHelper f = new FileHelper();
             string raw_vals = f.FileInput(infile);
             string[] sbox = raw_vals.Split(" ");
@@ -97,7 +96,7 @@ namespace AES{
             string c = sbox[index];
             return c;
         }
-        static byte[,] MixColumns(byte[,] state){
+        byte[,] MixColumns(byte[,] state){
 
             byte[,] k = new byte[4,4]{
                 {2,3,1,1},
@@ -120,7 +119,7 @@ namespace AES{
             return output;
         }
         //this function computes XOR addition between two blocks
-        static byte[,] XOrRoundKey(byte[,] a, byte[,] b){
+        byte[,] XOrRoundKey(byte[,] a, byte[,] b){
             byte[,] output = new byte[4,4];
             for(int i=0;i<4;i++){
                 for(int j=0;j<4;j++){
@@ -130,7 +129,7 @@ namespace AES{
             
             return output;
         }
-        static byte[,] key_expansion(byte[,] key, int n){
+        byte[,] key_expansion(byte[,] key, int n){
             byte[,] output = new byte[4,4];
 
             for(int word=0;word<4;word++){
@@ -150,7 +149,7 @@ namespace AES{
         }
  
         //this fx computes bit multiplication
-        static int gmul(int a, int b){
+        int gmul(int a, int b){
             int product = 0;
             int high_bits;
 
@@ -171,7 +170,7 @@ namespace AES{
             }
             return product;
         }
-        private static byte[,] Make2DArray(char[] input, int height, int width){
+        private  byte[,] Make2DArray(char[] input, int height, int width){
             byte[,] output = new byte[width, height];
             for (int w = 0; w < width; w++)
                 for (int h = 0; h < height; h++)
@@ -180,7 +179,7 @@ namespace AES{
                 }
             return output;
         }
-        private static string Print2DArray(byte[,] input, int height, int width){
+        private  string Print2DArray(byte[,] input, int height, int width){
             string output = "";
 
             for (int w = 0; w < width; w++){

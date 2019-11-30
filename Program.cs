@@ -1,24 +1,28 @@
-﻿
-//how to calculate n. 
-using System;
+﻿using System;
 using System.IO;
 using System.Numerics;
 using System.Collections.Generic;
+using AES;
 
+namespace Program{
 class encryption{
     public static void Main(){
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.Write("[1]Rot13\t[2]RSA \nPick your encryption: ");
+        Console.Write("[1]Rot13  [2]RSA  [3]AES \nPick your encryption: ");
         char encryption = char.ToLower(char.Parse(Console.ReadLine()));
         
         switch (encryption){
             case '1':
                 Rot13 r = new Rot13();
-                Console.WriteLine(r.go("plaintext"));
+                Console.WriteLine(r.go("URYYB JBEYQ"));
                 break;
             case '2':
                 RSA rSA = new RSA();
                 rSA.go();
+                break;
+            case '3':
+                AES.AES a = new AES.AES();
+                a.go("This is my Kung Fu","Two One Nine Two");
                 break;
             default:
                 break;
@@ -27,10 +31,19 @@ class encryption{
 }
 class Rot13{
     public string go(string plaintext){
+        //create return string
         string encrypted_text="";
+        //convert the string plaintext to array of characters
         foreach(byte b in System.Text.Encoding.UTF8.GetBytes(plaintext.ToCharArray())){
-                if(b>122||b<65){encrypted_text+=(char)b;continue;}
+                //filter text to exclude characters between 'A' and 'Z'
+                if(b>122||b<65){
+                    //add any excluded characters directly to the return string
+                    encrypted_text+=(char)b;
+                    continue;
+                    }
+                //convert character to uppercase and cast as an integer
                 int c = (int)Char.ToUpper((char)b);
+                //add 13 to the character and put it in the return string
                 encrypted_text+=(char)('A'+(c-(int)'A'+13) % 26);}
         return encrypted_text;
     }
@@ -39,6 +52,7 @@ class Rot13{
 reference : https://www.di-mgt.com.au/rsa_alg.html#x931
 */
 class RSA{
+    private const int CHARS_AVAILABLE = 27;
     public string go(){
         
         FileHelper fh = new FileHelper();
@@ -54,8 +68,8 @@ class RSA{
         int e  = int.Parse(public_key.Remove(0,public_key.IndexOf(',')+1).Trim());
         BigInteger n  = BigInteger.Parse(public_key.Remove(public_key.IndexOf(',')).Trim());
         Console.WriteLine("Encrypting file "+filename+"...");
-
-        BigInteger enc = (encrypt(fh.FileInput(filename),e,n));
+        string pt = fh.FileInput(filename);
+        BigInteger enc = (encrypt(pt,e,n));
         Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine("Encrypted text: " + enc);
         Console.ForegroundColor = ConsoleColor.Green;
@@ -71,7 +85,7 @@ class RSA{
         n  = BigInteger.Parse(private_key.Remove(private_key.IndexOf(',')).Trim());
 
         Console.WriteLine("Decrypting...");
-        string dec = decrypt(BigInteger.Parse(fh.FileInput(filename)),d,n,3);
+        string dec = decrypt(BigInteger.Parse(fh.FileInput(filename)),d,n,pt.Length);
         Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine("Decrypted text: " + dec);
         Console.ForegroundColor = ConsoleColor.Green;
@@ -89,16 +103,12 @@ class RSA{
 
         List<BigInteger> hist = new List<BigInteger>(); 
         BigInteger d=1;
-        if(e_t_gcd==1){
-            d = ExtendedEuclidian(t,t,e,0,0,hist);
-            }
-        else{
-                Console.WriteLine("e shares a factor with a prime: {0}",e_t_gcd);
-            }
+        if(e_t_gcd==1){d = ExtendedEuclidian(t,t,e,0,0,hist);}
+        else{Console.WriteLine("e shares a factor with a prime: {0}",e_t_gcd);}
         Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine(String.Format("Public Key: {0},{1}",n,e));
         Console.WriteLine(String.Format("Private Key: {0},{1}",n,d));
-        Console.WriteLine(String.Format("Phi: {0} d: {1}",t,d));
+        //Console.WriteLine(String.Format("Phi: {0} d: {1}",t,d));
         Console.ForegroundColor = ConsoleColor.Green;
     }
     public BigInteger encrypt(string plaintext, int e, BigInteger n){
@@ -107,7 +117,7 @@ class RSA{
         BigInteger base_27 = 0;
        foreach(char b in System.Text.Encoding.UTF8.GetBytes(plaintext.ToCharArray())){
             counter--;
-            BigInteger c = (b-64)*BigInteger.Pow(27,counter);
+            BigInteger c = (b-64)*BigInteger.Pow(CHARS_AVAILABLE,counter);
             base_27 += c;
        }
        BigInteger encrypted = BigInteger.Pow(base_27,e);
@@ -121,7 +131,7 @@ class RSA{
         int t = 1;
         while(t!=0 && encrypted_length>0){
             encrypted_length--;
-            BigInteger divisor = BigInteger.Pow(27,encrypted_length);
+            BigInteger divisor = BigInteger.Pow(CHARS_AVAILABLE,encrypted_length);
             decrypted_text+=(char)((base_27/divisor)+64);
             base_27 = base_27%divisor;
 
@@ -160,12 +170,12 @@ class RSA{
             pn++;
             
             try{
-            q = (int)(a/(BigInteger)b);
-            BigInteger temp=b;
-            b = a%b;
-            a=temp;
-            hist.Add(aux_p);
-            hist.Add(q);
+                q = (int)(a/(BigInteger)b);
+                BigInteger temp=b;
+                b = a%b;
+                a=temp;
+                hist.Add(aux_p);
+                hist.Add(q);
             }
             catch(Exception){
                 return aux_p;
@@ -211,6 +221,13 @@ class RSA{
         }
         return prime;
      }
+     /*
+     rabian-miller primality test, returns true if n is prime for all cases tested - number of cases tested determined
+     by probability>double p  
+      */
+    public bool miller(BigInteger n, double p){
+         return true;
+     }
 }
 static class ListExtension
     {
@@ -235,7 +252,7 @@ class FileHelper{
         }
     }
     public string FileInput(string filename){
-        FileStream F = new FileStream(filename, FileMode.OpenOrCreate, 
+        FileStream F = new FileStream(filename, FileMode.Open, 
             FileAccess.ReadWrite);
         byte[] bytes = new byte[F.Length];
         int numBytesToRead = (int)F.Length;
@@ -260,4 +277,5 @@ class FileHelper{
         }
     return str;
     }
+}
 }
